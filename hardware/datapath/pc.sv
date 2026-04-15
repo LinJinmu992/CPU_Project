@@ -5,14 +5,14 @@ module pc #(
     parameter RESET_ADDR = 32'h0000_0000 // 默认复位到 0 地址
 )(
     input              clk,      // 时钟信号
-    input              rst_n,    // 异步复位信号（低电平有效）
+    input              rst,      // 同步复位信号（高电平有效）
     input  [WIDTH-1:0] next_pc,  // 输入：来自 MUX 的下一个 PC 值
     output reg [WIDTH-1:0] pc_out // 输出：当前的 PC 值
 );
 
-    // 时序逻辑：只在时钟上升沿或复位下降沿动作
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
+    // 时序逻辑：只在时钟上升沿动作
+    always @(posedge clk) begin
+        if (rst) begin
             // 复位时，PC 回到起始地址
             pc_out <= RESET_ADDR;
         end else begin

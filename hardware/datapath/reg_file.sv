@@ -2,7 +2,7 @@
 
 module reg_file (
     input             clk,
-    input             rst_n,
+    input             rst,      // 同步复位信号（高电平有效）
     // 写端口
     input             we,       // 写使能 (Write Enable)
     input      [4:0]  w_addr,   // 写地址 (rd)
@@ -19,8 +19,8 @@ module reg_file (
     reg [31:0] regs [31:0];
 
     // --- 写逻辑 (时序逻辑) ---
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
+    always @(posedge clk) begin
+        if (rst) begin
             // 复位清零所有寄存器 (虽然实际芯片中可能不全清，但仿真建议清零)
             integer i;
             for (i = 0; i < 32; i = i + 1) regs[i] <= 32'b0;

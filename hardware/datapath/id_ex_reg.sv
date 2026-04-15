@@ -2,7 +2,7 @@
 
 module id_ex_reg (
     input               clk,
-    input               rst_n,
+    input               rst,      // 同步复位信号（高电平有效）
     input               en,        // 流水线使能
     input               clear,     // 清除流水线（用于分支冲刷）
     // 控制信号
@@ -47,8 +47,8 @@ module id_ex_reg (
     output reg  [6:0]   funct7_out
 );
 
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
+    always @(posedge clk) begin
+        if (rst) begin
             reg_write_out <= 1'b0;
             mem_to_reg_out <= 1'b0;
             mem_read_out <= 1'b0;

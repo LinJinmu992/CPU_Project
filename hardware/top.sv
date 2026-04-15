@@ -1,9 +1,22 @@
 `timescale 1ns / 1ps
+`include "defines.sv"
 
-module cpu_top (
-    input  logic clk,
-    input  logic rst_n
+module myCPU (
+    input  logic cpu_clk,
+    input  logic cpu_rst,
+    output logic [31:0] irom_addr,
+    input  logic [31:0] irom_data,
+    output logic [31:0] perip_addr,
+    output logic perip_wen,
+    output logic [1:0] perip_mask,
+    output logic [31:0] perip_wdata,
+    input  logic [31:0] perip_rdata
 );
+
+    // 内部时钟与复位
+    logic clk, rst;
+    assign clk = cpu_clk;
+    assign rst = cpu_rst; // 同步高电平复位
 
     // ---------------------------------------------------------
     // 流水线寄存器信号定义
@@ -80,7 +93,7 @@ module cpu_top (
     // --- IF/ID 寄存器 ---
     if_id_reg u_if_id_reg (
         .clk            (clk),
-        .rst_n          (rst_n),
+        .rst           (rst),
         .en             (!stall_if),       // 阻塞时停止流动
         .clear          (flush_id),        // 冲刷时清空
         .pc_in          (pc_if),
@@ -94,7 +107,7 @@ module cpu_top (
     // --- ID/EX 寄存器 ---
     id_ex_reg u_id_ex_reg (
         .clk            (clk),
-        .rst_n          (rst_n),
+        .rst           (rst),
         .en             (!stall_id),
         .clear          (flush_ex),
         .reg_write_in   (reg_write_id),
@@ -136,7 +149,7 @@ module cpu_top (
     // --- EX/MEM 寄存器 ---
     ex_mem_reg u_ex_mem_reg (
         .clk            (clk),
-        .rst_n          (rst_n),
+        .rst           (rst),
         .en             (!stall_ex),
         .clear          (flush_mem),
         .reg_write_in   (reg_write_ex),
@@ -160,7 +173,7 @@ module cpu_top (
     // --- MEM/WB 寄存器 ---
     mem_wb_reg u_mem_wb_reg (
         .clk            (clk),
-        .rst_n          (rst_n),
+        .rst           (rst),
         .en             (!stall_mem),
         .clear          (flush_wb),
         .reg_write_in   (reg_write_mem),
@@ -180,17 +193,16 @@ module cpu_top (
     // ---------------------------------------------------------
     
     // --- IF 阶段 ---
-    pc u_pc (
+    pc #(.RESET_ADDR(`IROM_BASE)) u_pc (
         .clk      (clk),
-        .rst_n    (rst_n),
+        .rst      (rst),
         .next_pc  (branch_taken_ex ? pc_target_ex : pc_plus_4_if), // 分支跳转
         .pc_out   (pc_if)
     );
     
-    inst_mem u_irom (
-        .addr   (pc_if),
-        .instr  (instr_if)
-    );
+    // 指令存储器接口
+    assign irom_addr = pc_if;
+    assign instr_if = irom_data;
     
     assign pc_plus_4_if = pc_if + 4;
     
@@ -218,7 +230,7 @@ module cpu_top (
     // 寄存器堆
     reg_file u_regfile (
         .clk        (clk),
-        .rst_n      (rst_n),
+        .rst        (rst),
         .we         (reg_write_wb),
         .r_addr1    (rs1_addr_id),
         .r_addr2    (rs2_addr_id),
@@ -290,13 +302,12 @@ module cpu_top (
     assign branch_taken_ex = branch_ex && alu_zero_ex;
     
     // --- MEM 阶段 ---
-    data_mem u_dram (
-        .clk        (clk),
-        .we         (mem_write_mem),
-        .addr       (alu_result_mem),
-        .write_data (rs2_data_mem),
-        .read_data  (mem_read_data_mem)
-    );
+    // 外设接口信号生成
+    assign perip_addr = alu_result_mem;
+    assign perip_wen = mem_write_mem;
+    assign perip_mask = 2'b10; // 暂时固定为字访问
+    assign perip_wdata = rs2_data_mem;
+    assign mem_read_data_mem = perip_rdata;
     
     // --- WB 阶段 ---
     assign rd_data_wb = mem_to_reg_wb ? mem_read_data_wb : alu_result_wb;
