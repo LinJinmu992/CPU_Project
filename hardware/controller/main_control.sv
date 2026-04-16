@@ -33,13 +33,16 @@ module main_control (
                 branch = 1'b1; alu_op = `ALUOP_BRANCH; imm_sel = 3'b010;
             end
             `OP_LUI: begin
-                reg_write = 1'b1; alu_src = 1'b1; alu_op = `ALUOP_LOAD_STORE; imm_sel = 3'b011;
+                reg_write = 1'b1; alu_src = 1'b1; alu_op = `ALUOP_ITYPE; imm_sel = 3'b011; // 修正 alu_op
             end
             `OP_JAL: begin
-                reg_write = 1'b1; branch = 1'b1; imm_sel = 3'b100; // 注意：需要额外的跳转逻辑
+                reg_write = 1'b1; branch = 1'b1; imm_sel = 3'b100; // JAL
             end
             `OP_JALR: begin
-                reg_write = 1'b1; alu_src = 1'b1; branch = 1'b1; imm_sel = 3'b000; // 注意：JALR 使用 I 型立即数
+                reg_write = 1'b1; alu_src = 1'b1; branch = 1'b1; alu_op = `ALUOP_LOAD_STORE; imm_sel = 3'b000;
+            end
+            `OP_AUIPC: begin // AUIPC
+                reg_write = 1'b1; alu_src = 1'b1; alu_op = `ALUOP_LOAD_STORE; imm_sel = 3'b011;
             end
             // 这里可以继续添加 AUIPC 等
             default: ;

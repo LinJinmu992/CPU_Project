@@ -31,8 +31,11 @@ module reg_file (
     end
 
     // --- 读逻辑 (组合逻辑) ---
-    // 如果读地址是 0，强制输出 0；否则输出对应寄存器值
-    assign r_data1 = (r_addr1 == 5'b0) ? 32'b0 : regs[r_addr1];
-    assign r_data2 = (r_addr2 == 5'b0) ? 32'b0 : regs[r_addr2];
+    // --- 修改后：集成内部前递的读逻辑 ---
+    assign r_data1 = (r_addr1 == 5'b0) ? 32'b0 : 
+                     ((we && (w_addr == r_addr1)) ? w_data : regs[r_addr1]);
+
+    assign r_data2 = (r_addr2 == 5'b0) ? 32'b0 : 
+                     ((we && (w_addr == r_addr2)) ? w_data : regs[r_addr2]);
 
 endmodule
