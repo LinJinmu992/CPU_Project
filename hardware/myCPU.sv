@@ -71,8 +71,8 @@ module myCPU (
     
     // MEM 阶段
     logic [31:0] mem_read_data_mem;
-    logic [7:0]  lb_data;
-    logic [15:0] lh_data;
+    // logic [7:0]  lb_data;
+    // logic [15:0] lh_data;
     
     // MEM/WB 寄存器
     logic        reg_write_wb, mem_to_reg_wb;
@@ -80,6 +80,7 @@ module myCPU (
     logic [31:0] mem_read_data_wb;
     logic [4:0]  rd_addr_wb;
     logic [31:0] pc_plus_4_wb;
+    logic [2:0]  funct3_wb; // 💡 专门用来接收从寄存器里传出来的 funct3 说明书
     logic [6:0]  opcode_wb;
     
     // WB 阶段
@@ -188,7 +189,7 @@ module myCPU (
         .reg_write_in   (reg_write_mem),
         .mem_to_reg_in  (mem_to_reg_mem),
         .alu_result_in  (alu_result_mem),
-        .mem_read_data_in (mem_read_data_mem),
+        .mem_read_data_in (perip_rdata),
         .rd_addr_in     (rd_addr_mem),
         .pc_plus_4_in   (pc_plus_4_mem),
         .opcode_in      (opcode_mem),
@@ -198,7 +199,9 @@ module myCPU (
         .mem_read_data_out (mem_read_data_wb),
         .rd_addr_out    (rd_addr_wb),
         .pc_plus_4_out  (pc_plus_4_wb),
-        .opcode_out     (opcode_wb)
+        .opcode_out     (opcode_wb),
+        .funct3_in(funct3_mem),
+        .funct3_out(funct3_wb)
     );
     
     // ---------------------------------------------------------
@@ -324,6 +327,7 @@ module myCPU (
     
     // --- MEM 阶段 ---
     assign perip_addr = alu_result_mem;
+    //assign perip_addr = {alu_result_mem[31:2], 2'b00};
     assign perip_wen = mem_write_mem;
     always @(*) begin
         case (funct3_mem)
@@ -336,39 +340,88 @@ module myCPU (
     assign perip_wdata = rs2_data_mem << (8 * alu_result_mem[1:0]);
 
     // 根据地址低两位选择字节 (符合小端序)
-    always @(*) begin
-        case (alu_result_mem[1:0])
-            2'b00: lb_data = perip_rdata[7:0];
-            2'b01: lb_data = perip_rdata[15:8];
-            2'b10: lb_data = perip_rdata[23:16];
-            2'b11: lb_data = perip_rdata[31:24];
-            default: lb_data = 8'b0;
-        endcase
-    end
+    // always @(*) begin
+    //     case (alu_result_mem[1:0])
+    //         2'b00: lb_data = perip_rdata[7:0];
+    //         2'b01: lb_data = perip_rdata[15:8];
+    //         2'b10: lb_data = perip_rdata[23:16];
+    //         2'b11: lb_data = perip_rdata[31:24];
+    //         default: lb_data = 8'b0;
+    //     endcase
+    // end
 
-    // 选择半字
-    assign lh_data = alu_result_mem[1] ? perip_rdata[31:16] : perip_rdata[15:0];
+    // // 选择半字
+    // //assign lh_data = alu_result_mem[1] ? perip_rdata[31:16] : perip_rdata[15:0];
+    // always @(*) begin
+    //     case (alu_result_mem[1:0])
+    //         2'b00:   lh_data = perip_rdata[15:0];  // 对应字节 [1, 0]
+    //         2'b01:   lh_data = perip_rdata[23:8];  // 🎯 解决地址 13 的关键！对应字节 [2, 1]
+    //         2'b10:   lh_data = perip_rdata[31:16]; // 对应字节 [3, 2]
+    //         default: lh_data = perip_rdata[15:0];
+    //     endcase
+    // end
 
-    // 根据 funct3 进行最终的写回数据扩展
-    always @(*) begin
-        case (funct3_mem)
-            3'b000: mem_read_data_mem = { {24{lb_data[7]}}, lb_data };  // LB (符号扩展)
-            3'b001: mem_read_data_mem = { {16{lh_data[15]}}, lh_data }; // LH (符号扩展)
-            3'b010: mem_read_data_mem = perip_rdata;                   // LW
-            3'b100: mem_read_data_mem = { 24'b0, lb_data };            // LBU (零扩展)
-            3'b101: mem_read_data_mem = { 16'b0, lh_data };            // LHU (零扩展)
-            default: mem_read_data_mem = perip_rdata;
-        endcase
-    end
+    // // 根据 funct3 进行最终的写回数据扩展
+    // always @(*) begin
+    //     case (funct3_mem)
+    //         3'b000: mem_read_data_mem = { {24{lb_data[7]}}, lb_data };  // LB (符号扩展)
+    //         3'b001: mem_read_data_mem = { {16{lh_data[15]}}, lh_data }; // LH (符号扩展)
+    //         3'b010: mem_read_data_mem = perip_rdata;                   // LW
+    //         3'b100: mem_read_data_mem = { 24'b0, lb_data };            // LBU (零扩展)
+    //         3'b101: mem_read_data_mem = { 16'b0, lh_data };            // LHU (零扩展)
+    //         default: mem_read_data_mem = perip_rdata;
+    //     endcase
+    // end
     
     // --- WB 阶段 ---
-    always @(*) begin
-        if (opcode_wb == `OP_JAL || opcode_wb == `OP_JALR)
-            rd_data_wb = pc_plus_4_wb;
-        else
-            rd_data_wb = mem_to_reg_wb ? mem_read_data_wb : alu_result_wb;
-    end
-    
+
+// 1. 【新增】定义内部中间信号，用于存放处理后的数据
+logic [7:0]  lb_data_wb;
+logic [15:0] lh_data_wb;
+logic [31:0] final_mem_read_data_wb;
+
+// 2. 【新增】从 WB 阶段的原始内存数据中抠出字节 (LB/LBU)
+always @(*) begin
+    case (alu_result_wb[1:0]) // 使用传到 WB 的地址低两位
+        2'b00: lb_data_wb = mem_read_data_wb[7:0];
+        2'b01: lb_data_wb = mem_read_data_wb[15:8];
+        2'b10: lb_data_wb = mem_read_data_wb[23:16];
+        2'b11: lb_data_wb = mem_read_data_wb[31:24];
+        default: lb_data_wb = 8'b0;
+    endcase
+end
+
+// 3. 【新增】从 WB 阶段的原始内存数据中抠出半字 (LH/LHU) —— 🎯 核心修复点
+always @(*) begin
+    case (alu_result_wb[1:0])
+        2'b00:   lh_data_wb = mem_read_data_wb[15:0];
+        2'b01:   lh_data_wb = mem_read_data_wb[23:8];  // 解决地址 13 非对齐读取
+        2'b10:   lh_data_wb = mem_read_data_wb[31:16];
+        default: lh_data_wb = mem_read_data_wb[15:0];
+    endcase
+end
+
+// 4. 【新增】根据指令码进行符号扩展或零扩展
+always @(*) begin
+    case (funct3_wb) // ⚠️ 确保 funct3 已经通过寄存器传到了 WB
+        3'b000: final_mem_read_data_wb = { {24{lb_data_wb[7]}}, lb_data_wb };  // LB
+        3'b001: final_mem_read_data_wb = { {16{lh_data_wb[15]}}, lh_data_wb }; // LH
+        3'b010: final_mem_read_data_wb = mem_read_data_wb;                    // LW
+        3'b100: final_mem_read_data_wb = { 24'b0, lb_data_wb };               // LBU
+        3'b101: final_mem_read_data_wb = { 16'b0, lh_data_wb };               // LHU
+        default: final_mem_read_data_wb = mem_read_data_wb;
+    endcase
+end
+
+// 5. 【修改】这是你原有的 always 块，但里面的 mem_read_data_wb 换成了加工后的 final_mem_read_data_wb
+always @(*) begin
+    if (opcode_wb == `OP_JAL || opcode_wb == `OP_JALR)
+        rd_data_wb = pc_plus_4_wb;
+    else
+        // 关键改动：原本直接连 mem_read_data_wb，现在连 final_mem_read_data_wb
+        rd_data_wb = mem_to_reg_wb ? final_mem_read_data_wb : alu_result_wb;
+end
+
     // ---------------------------------------------------------
     // 冒险控制单元
     // ---------------------------------------------------------
@@ -377,6 +430,8 @@ module myCPU (
         .rs2_addr_id   (rs2_addr_id),
         .mem_read_ex   (mem_read_ex),
         .rd_addr_ex    (rd_addr_ex),
+        .mem_read_mem  (mem_read_mem), // 🆕 确保接上了
+        .rd_addr_mem   (rd_addr_mem),  // 🆕 确保接上了
         .stall_if      (stall_if),
         .stall_id      (stall_id),
         .stall_ex      (stall_ex),
