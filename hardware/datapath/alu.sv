@@ -23,13 +23,15 @@ module alu(
     assign b_real  = (alu_ctrl == `ALU_SUB) ? ~b : b;
     assign cla_cin = (alu_ctrl == `ALU_SUB);
     
-    cla_32bit u_my_adder (
-        .a    (a),
-        .b    (b_real),
-        .cin  (cla_cin),
-        .sum  (add_sub_res),
-        .cout (cla_cout)
-    );
+    //cla_32bit u_my_adder (
+    //    .a    (a),
+    //    .b    (b_real),
+    //    .cin  (cla_cin),
+    //    .sum  (add_sub_res),
+    //    .cout (cla_cout)
+    //);
+    // 临时测试：看看是不是加法器模块的问题
+    assign add_sub_res = (alu_ctrl == `ALU_SUB) ? (a - b) : (a + b);
 
     // 3. Logic Unit
     assign logic_res = (alu_ctrl == `ALU_AND) ? (a & b) :

@@ -8,3 +8,6 @@ myCPU.md
 # 建议也忽略一些常见的系统或编辑器缓存
 .DS_Store
 *.swp
+
+#忽略 *.txt
+*.txt

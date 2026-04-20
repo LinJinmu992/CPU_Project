@@ -209,7 +209,7 @@ module myCPU (
     pc #(.RESET_ADDR(`IROM_BASE)) u_pc (
         .clk      (clk),
         .rst      (rst),
-        .next_pc  (!stall_if ? (branch_taken_ex ? pc_target_ex : pc_plus_4_if) : pc_if),
+        .next_pc  (branch_taken_ex ? pc_target_ex : (!stall_if ? pc_plus_4_if : pc_if)),
         .pc_out   (pc_if)
     );
     
