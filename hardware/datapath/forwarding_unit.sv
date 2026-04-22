@@ -20,19 +20,22 @@ module forwarding_unit (
         forward_a = 2'b00;
         forward_b = 2'b00;
 
-        // 来自 MEM 阶段的转发（优先级最高）
-        if (reg_write_mem && rd_addr_mem != 5'b0) begin
-            if (rd_addr_mem == rs1_addr_ex) forward_a = 2'b01;
-            if (rd_addr_mem == rs2_addr_ex) forward_b = 2'b01;
+        // --- Forward A (rs1) ---
+        // 优先检查 MEM 级（数据最新，必须用 else if 互斥）
+        if (reg_write_mem && rd_addr_mem != 5'b0 && rd_addr_mem == rs1_addr_ex) begin
+            forward_a = 2'b01; 
+        end 
+        // 只有 MEM 没撞上，才检查 WB 级
+        else if (reg_write_wb && rd_addr_wb != 5'b0 && rd_addr_wb == rs1_addr_ex) begin
+            forward_a = 2'b10;
         end
 
-        // 来自 WB 阶段的转发（优先级次之）
-        if (reg_write_wb && rd_addr_wb != 5'b0) begin
-            // 如果 MEM 阶段没有转发到同一个寄存器，则覆盖
-            if (rd_addr_wb == rs1_addr_ex && !(reg_write_mem && rd_addr_mem == rs1_addr_ex))
-                forward_a = 2'b10;
-            if (rd_addr_wb == rs2_addr_ex && !(reg_write_mem && rd_addr_mem == rs2_addr_ex))
-                forward_b = 2'b10;
+        // --- Forward B (rs2) ---
+        if (reg_write_mem && rd_addr_mem != 5'b0 && rd_addr_mem == rs2_addr_ex) begin
+            forward_b = 2'b01;
+        end 
+        else if (reg_write_wb && rd_addr_wb != 5'b0 && rd_addr_wb == rs2_addr_ex) begin
+            forward_b = 2'b10;
         end
     end
 

@@ -33,7 +33,10 @@ module main_control (
                 branch = 1'b1; alu_op = `ALUOP_BRANCH; imm_sel = 3'b010;
             end
             `OP_LUI: begin
-                reg_write = 1'b1; alu_src = 1'b1; alu_op = `ALUOP_ITYPE; imm_sel = 3'b011; // 修正 alu_op
+                reg_write = 1'b1; 
+                alu_src = 1'b1; 
+                alu_op = `ALUOP_LOAD_STORE; // 🌟 核心修复：改成和 AUIPC 一样，强制让 ALU 执行加法
+                imm_sel = 3'b011;
             end
             `OP_JAL: begin
                 reg_write = 1'b1; branch = 1'b1; imm_sel = 3'b100; // JAL

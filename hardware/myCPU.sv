@@ -24,6 +24,7 @@ module myCPU (
     // IF 阶段
     logic [31:0] pc_if, pc_plus_4_if;
     logic [31:0] instr_if;
+    // logic pipe_en_if;  // 定义 IF 阶段使能信号
     
     // IF/ID 寄存器
     logic [31:0] pc_id, pc_plus_4_id;
@@ -35,6 +36,7 @@ module myCPU (
     logic [4:0]  rs1_addr_id, rs2_addr_id, rd_addr_id;
     logic [2:0]  funct3_id;
     logic [6:0]  funct7_id;
+    // logic pipe_en_id;  // 定义 ID 阶段使能信号
     // 控制信号
     logic        reg_write_id, mem_to_reg_id, mem_read_id, mem_write_id;
     logic        alu_src_id, branch_id;
@@ -215,13 +217,15 @@ module myCPU (
     pc #(.RESET_ADDR(`IROM_BASE)) u_pc (
         .clk      (clk),
         .rst      (rst),
-        .next_pc  (branch_taken_ex ? pc_target_ex : (!stall_if ? pc_plus_4_if : pc_if)),
+        .en       (!stall_if),
+        .next_pc  (branch_taken_ex ? pc_target_ex : pc_plus_4_if),
         .pc_out   (pc_if)
     );
     
     assign irom_addr = pc_if;
     assign instr_if = irom_data;
     assign pc_plus_4_if = pc_if + 4;
+    // assign pipe_en_if = !stall_if;
     
     // --- ID 阶段 ---
     assign rs1_addr_id = instr_id[19:15];
@@ -229,6 +233,7 @@ module myCPU (
     assign rd_addr_id  = instr_id[11:7];
     assign funct3_id   = instr_id[14:12];
     assign funct7_id   = instr_id[31:25];
+    // assign pipe_en_id = !stall_id;
     
     main_control u_main_ctrl (
         .opcode     (instr_id[6:0]),
@@ -398,15 +403,16 @@ module myCPU (
     // 冒险控制单元
     // ---------------------------------------------------------
     hazard_detection_unit u_hazard_detection (
+        .opcode_id     (instr_id[6:0]),
         .rs1_addr_id   (rs1_addr_id),
         .rs2_addr_id   (rs2_addr_id),
         .mem_read_ex   (mem_read_ex),
         .rd_addr_ex    (rd_addr_ex),
-        .mem_read_mem  (mem_read_mem), // 🆕 确保接上了
-        .rd_addr_mem   (rd_addr_mem),  // 🆕 确保接上了
+        // .mem_read_mem  (mem_read_mem), // 🆕 确保接上了
+        // .rd_addr_mem   (rd_addr_mem),  // 🆕 确保接上了
         .stall_if      (stall_if),
         .stall_id      (stall_id),
-        .stall_ex      (stall_ex),
+        // .stall_ex      (stall_ex),
         .flush_ex      (flush_ex)
     );
 

@@ -12,7 +12,20 @@ module alu_control (
     always @(*) begin
         case (alu_op)
             `ALUOP_LOAD_STORE: alu_ctrl = `ALU_ADD;
-            `ALUOP_BRANCH:     alu_ctrl = `ALU_SUB;
+            `ALUOP_BRANCH: begin
+                case (funct3)
+                    // BEQ, BNE 只需要相减，看 ALU 输出的 zero 标志即可
+                    3'b000, 3'b001: alu_ctrl = `ALU_SUB;  
+                    
+                    // BLT, BGE 需要有符号比较，呼叫 ALU 的 SLT 功能
+                    3'b100, 3'b101: alu_ctrl = `ALU_SLT;  
+                    
+                    // BLTU, BGEU 需要无符号比较，呼叫 ALU 的 SLTU 功能
+                    3'b110, 3'b111: alu_ctrl = `ALU_SLTU; 
+                    
+                    default: alu_ctrl = `ALU_SUB;
+                endcase
+            end
             `ALUOP_RTYPE: begin
                 case (funct3)
                     `F3_ADD_SUB: alu_ctrl = (funct7[5]) ? `ALU_SUB : `ALU_ADD;

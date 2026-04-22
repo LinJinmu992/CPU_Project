@@ -13,7 +13,7 @@ module alu(
     // 1. Internal signals
     wire [31:0] add_sub_res;
     wire [31:0] logic_res;
-    wire [31:0] shift_res;
+    reg  [31:0] shift_res;
     wire [31:0] cmp_res;
     wire [31:0] b_real;
     wire        cla_cin;
@@ -38,10 +38,15 @@ module alu(
                        (alu_ctrl == `ALU_OR)  ? (a | b) :
                        (alu_ctrl == `ALU_XOR) ? (a ^ b) : 32'b0;
 
-    // 4. Shift Unit
-    assign shift_res = (alu_ctrl == `ALU_SLL) ? (a << b[4:0]) :
-                       (alu_ctrl == `ALU_SRL) ? (a >> b[4:0]) :
-                       (alu_ctrl == `ALU_SRA) ? ($signed(a) >>> b[4:0]) : 32'b0;
+    // 4. Shift Unit (修复 Verilog 无符号传染 Bug)
+    always @(*) begin
+        case (alu_ctrl)
+            `ALU_SLL: shift_res = a << b[4:0];
+            `ALU_SRL: shift_res = a >> b[4:0];
+            `ALU_SRA: shift_res = $signed(a) >>> b[4:0]; // 独立的分支，$signed 绝对生效
+            default:  shift_res = 32'b0;
+        endcase
+    end
 
     // 5. Comparison Unit
     assign cmp_res = (alu_ctrl == `ALU_SLT)  ? {31'b0, ($signed(a) < $signed(b))} :

@@ -1,24 +1,21 @@
-`timescale 1ns / 1ps
-
 module pc #(
     parameter WIDTH = 32,
-    parameter RESET_ADDR = 32'h0000_0000 // 默认复位到 0 地址
+    parameter RESET_ADDR = 32'h0000_0000
 )(
-    input              clk,      // 时钟信号
-    input              rst,      // 同步复位信号（高电平有效）
-    input  [WIDTH-1:0] next_pc,  // 输入：来自 MUX 的下一个 PC 值
-    output reg [WIDTH-1:0] pc_out // 输出：当前的 PC 值
+    input               clk,
+    input               rst,
+    input               en,       // 🆕 新增：使能信号（通行证）
+    input  [WIDTH-1:0]  next_pc,
+    output reg [WIDTH-1:0] pc_out
 );
 
-    // 时序逻辑：只在时钟上升沿动作
     always @(posedge clk) begin
         if (rst) begin
-            // 复位时，PC 回到起始地址
             pc_out <= RESET_ADDR;
-        end else begin
-            // 正常运行时，每一拍更新一次地址
+        end else if (en) begin    // 🆕 只有收到“准行证”才更新
             pc_out <= next_pc;
         end
+        // 如果 en 为 0，不写 else，它会自动保持原值（锁死当前 PC）
     end
 
 endmodule
