@@ -1,0 +1,13 @@
+# 忽略特定的 Markdown 文档
+error.md
+myCPU.md
+
+# 或者如果你想忽略项目中所有的 Markdown 文件，可以使用：
+# *.md
+
+# 建议也忽略一些常见的系统或编辑器缓存
+.DS_Store
+*.swp
+
+#忽略 *.txt
+*.txt

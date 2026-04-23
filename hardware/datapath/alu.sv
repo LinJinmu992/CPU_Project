@@ -1,90 +1,71 @@
-`timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date: 03/12/2026 06:03:54 PM
-// Design Name: 
-// Module Name: alu
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: 
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
+`include "defines.sv"
 
-    // -------------------------------------------------------------------
-// Ä£¿éÃû£ºalu.v
-// ¹¦ÄÜ£ºÖ§³Ö RV32I Ö¸Áî¼¯µÄÍêÕû ALU£¨»ù´¡°æ£©
-// -------------------------------------------------------------------
+`timescale 1ns / 1ps
 
 module alu(
-    input  [31:0] a,           // ²Ù×÷Êı rs1
-    input  [31:0] b,           // ²Ù×÷Êı rs2 »ò Á¢¼´Êı imm
-    input  [3:0]  alu_ctrl,      // ALU ¿ØÖÆĞÅºÅ (ÓÉ defines.v ¶¨Òå)
-    output reg [31:0] res,     // ¼ÆËã½á¹û
-    output        zero         // Áã±êÖ¾Î» (ÓÃÓÚ beq/bne µÈ·ÖÖ§)
+    input  [31:0] a,           // rs1
+    input  [31:0] b,           // rs2 or imm
+    input  [3:0]  alu_ctrl,    // ALU control signals
+    output reg [31:0] res,     // result
+    output        zero         // zero flag
 );
 
-    // 1. ÖĞ¼ä½á¹û¶¨Òå
+    // 1. Internal signals
     wire [31:0] add_sub_res;
     wire [31:0] logic_res;
-    wire [31:0] shift_res;
+    reg  [31:0] shift_res;
     wire [31:0] cmp_res;
     wire [31:0] b_real;
     wire        cla_cin;
     wire        cla_cout;
 
-    // 2. ËãÊõµ¥Ôª (½«À´Äã¿ÉÒÔ°ÑÕâÒ»ĞĞ»»³ÉÄãµÄ CLA ÊµÀı»¯)
-    // ¼¼ÇÉ£º¼õ·¨ A-B ÔÚÓ²¼şÉÏÍ¨¹ı A + (~B) + 1 ÊµÏÖ
+    // 2. Arithmetic Unit
     assign b_real  = (alu_ctrl == `ALU_SUB) ? ~b : b;
     assign cla_cin = (alu_ctrl == `ALU_SUB);
     
-    cla_32bit u_my_adder (
-        .a    (a),            // Á¬µ½ ALU µÄÊäÈë a
-        .b    (b_real),       // Á¬µ½´¦ÀíºóµÄ b_real
-        .cin  (cla_cin),      // Á¬µ½¼õ·¨ÅĞ¶ÏÂß¼­³öµÄ cin
-        .sum  (add_sub_res),  // ¼ÆËã½á¹ûÖ±½Ó´«¸ø add_sub_res Ïß
-        .cout (cla_cout)      // ½øÎ»Êä³ö¿ÉÒÔĞü¿Õ
-    );
+    //cla_32bit u_my_adder (
+    //    .a    (a),
+    //    .b    (b_real),
+    //    .cin  (cla_cin),
+    //    .sum  (add_sub_res),
+    //    .cout (cla_cout)
+    //);
+    // ä¸´æ—¶æµ‹è¯•ï¼šçœ‹çœ‹æ˜¯ä¸æ˜¯åŠ æ³•å™¨æ¨¡å—çš„é—®é¢˜
+    assign add_sub_res = (alu_ctrl == `ALU_SUB) ? (a - b) : (a + b);
 
-    // 3. Âß¼­µ¥Ôª
+    // 3. Logic Unit
     assign logic_res = (alu_ctrl == `ALU_AND) ? (a & b) :
                        (alu_ctrl == `ALU_OR)  ? (a | b) :
                        (alu_ctrl == `ALU_XOR) ? (a ^ b) : 32'b0;
 
-    // 4. ÒÆÎ»µ¥Ôª (×¢Òâ£ºb[4:0] ÏŞÖÆÒÆÎ»·¶Î§ 0-31)
-    assign shift_res = (alu_ctrl == `ALU_SLL) ? (a << b[4:0]) :             // Âß¼­×óÒÆ
-                       (alu_ctrl == `ALU_SRL) ? (a >> b[4:0]) :             // Âß¼­ÓÒÒÆ
-                       (alu_ctrl == `ALU_SRA) ? ($signed(a) >>> b[4:0]) : 32'b0; // ËãÊõÓÒÒÆ
+    // 4. Shift Unit (ä¿®å¤ Verilog æ— ç¬¦å·ä¼ æŸ“ Bug)
+    always @(*) begin
+        case (alu_ctrl)
+            `ALU_SLL: shift_res = a << b[4:0];
+            `ALU_SRL: shift_res = a >> b[4:0];
+            `ALU_SRA: shift_res = $signed(a) >>> b[4:0]; // ç‹¬ç«‹çš„åˆ†æ”¯ï¼Œ$signed ç»å¯¹ç”Ÿæ•ˆ
+            default:  shift_res = 32'b0;
+        endcase
+    end
 
-    // 5. ±È½Ïµ¥Ôª (ÓÃÓÚ SLT/SLTU Ö¸Áî)
+    // 5. Comparison Unit
     assign cmp_res = (alu_ctrl == `ALU_SLT)  ? {31'b0, ($signed(a) < $signed(b))} :
                      (alu_ctrl == `ALU_SLTU) ? {31'b0, (a < b)} : 32'b0;
 
-    // 6. ×Üµ÷¶È£º½á¹û¶àÂ·Ñ¡ÔñÆ÷ (Mux)
+    // 6. Final Result MUX
     always @(*) begin
         case (alu_ctrl)
             `ALU_ADD, `ALU_SUB: res = add_sub_res;
             `ALU_AND, `ALU_OR, 
             `ALU_XOR:           res = logic_res;
             `ALU_SLL, `ALU_SRL, 
-            `ALU_SRA:           res = $signed(a) >>> b[4:0];
+            `ALU_SRA:           res = shift_res;
             `ALU_SLT, `ALU_SLTU:res = cmp_res;
             default:            res = 32'b0;
         endcase
     end
 
-    // 7. Áã±êÖ¾Î»£ºÈç¹û½á¹ûÎª 0£¬Ôò zero Îª¸ßµçÆ½
+    // 7. Zero Flag
     assign zero = (res == 32'b0);
 
 endmodule
-
-
-

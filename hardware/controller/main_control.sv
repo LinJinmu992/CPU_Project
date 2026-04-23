@@ -32,7 +32,22 @@ module main_control (
             `OP_BRANCH: begin
                 branch = 1'b1; alu_op = `ALUOP_BRANCH; imm_sel = 3'b010;
             end
-            // 这里可以继续添加 LUI, JAL 等
+            `OP_LUI: begin
+                reg_write = 1'b1; 
+                alu_src = 1'b1; 
+                alu_op = `ALUOP_LOAD_STORE; // 🌟 核心修复：改成和 AUIPC 一样，强制让 ALU 执行加法
+                imm_sel = 3'b011;
+            end
+            `OP_JAL: begin
+                reg_write = 1'b1; branch = 1'b1; imm_sel = 3'b100; // JAL
+            end
+            `OP_JALR: begin
+                reg_write = 1'b1; alu_src = 1'b1; branch = 1'b1; alu_op = `ALUOP_LOAD_STORE; imm_sel = 3'b000;
+            end
+            `OP_AUIPC: begin // AUIPC
+                reg_write = 1'b1; alu_src = 1'b1; alu_op = `ALUOP_LOAD_STORE; imm_sel = 3'b011;
+            end
+            // 这里可以继续添加 AUIPC 等
             default: ;
         endcase
     end
